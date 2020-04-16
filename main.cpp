@@ -99,8 +99,8 @@ public:
                     ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
             double u =
                     -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
-            std::cout << "t, u:" << t << " " << u << std::endl;
-            if (abs(prod(direction, t)) <= currentMinDistance && t >= 0 && u <= 1) {
+            //std::cout << "t, u:" << t << " " << u << std::endl;
+            if (abs(prod(direction, t)) <= currentMinDistance && t >= 0 && u >= 0 && u <= 1) {
                 currentMinDistance = abs(prod(direction, t));
                 this->line = line2P(p1, p1 + prod(direction, t));
             }
@@ -119,7 +119,7 @@ public:
     Scene(sf::RenderWindow &window) {
         sf::Vector2u windowSize = window.getSize();
         boundaries.emplace_back(Vector2f(0, 0), Vector2f(windowSize.x, 0));
-        boundaries.emplace_back(Vector2f(0, 0), Vector2f(windowSize.y, 0));
+        boundaries.emplace_back(Vector2f(0, 0), Vector2f(0, windowSize.y));
         boundaries.emplace_back(Vector2f(windowSize.x, 0), Vector2f(windowSize.x, windowSize.y));
         boundaries.emplace_back(Vector2f(0, windowSize.y), Vector2f(windowSize.x, windowSize.y));
 
@@ -147,8 +147,8 @@ public:
     LightSource(sf::RenderWindow &window, Vector2f origin) {
         this->window = &window;
         this->origin = origin;
-        for (int i = 0; i < 20; ++i) {
-            rays.emplace_back(Ray(origin, origin + Vector2f(cos(i * 3.14 / 10), sin(i * 3.14 / 10))));
+        for (int i = 0; i < 100; ++i) {
+            rays.emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / 100), sin(i * 2 * 3.14 / 100))));
         }
     }
 
@@ -186,7 +186,7 @@ int main() {
     //////////////////////////////////////////////////////////////////////////
 
     Boundary boundary1(Vector2f(100, 100), Vector2f(500, 300)),
-            boundary2(Vector2f(200, 800), Vector2f(800, 50)),
+            boundary2(Vector2f(200, 800), Vector2f(400, 50)),
             boundary3(Vector2f(0, 0), Vector2f(150, 400));
 
 
