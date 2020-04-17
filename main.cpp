@@ -37,14 +37,27 @@ float abs(Vector2f a) {
     return sqrt(a.x * a.x + a.y * a.y);
 }
 
+Vector2f prod(Vector2f vector, double num) {
+    return Vector2f(vector.x * num, vector.y * num);
+}
+
+Vector2f normalize(Vector2f &vector){
+    return prod(vector,1/abs(vector));
+}
+
+Vector2f normalVector(Vector2f &vector){
+    return prod(vector,1/abs(vector));
+}
+
+bool isEqual (double num1, double num2){
+    double absoluteEpsilon = 0.0001;
+    return fabs(num2 - num1) <= absoluteEpsilon;
+}
+
 //
 //sf::Vector2f Vector2f(const vectorDouble &vector){
 //    return sf::Vector2f(vector[0],vector[1]);
 //}
-
-Vector2f prod(Vector2f vector, double num) {
-    return Vector2f(vector.x * num, vector.y * num);
-}
 
 class Line {
 protected:
@@ -91,7 +104,7 @@ public:
 
     void computeBoundaryIntersection(Boundary &boundary) {
         Vector2f a = direction, l = boundary.direction;
-        if (det(a, l) != 0) {
+        if (!isEqual(det(a, l) , 0)) {
             double x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
             double x3 = boundary.p1.x, y3 = boundary.p1.y, x4 = boundary.p2.x, y4 = boundary.p2.y;
 
@@ -100,10 +113,21 @@ public:
             double u =
                     -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
             //std::cout << "t, u:" << t << " " << u << std::endl;
-            if (abs(prod(direction, t)) <= currentMinDistance && t >= 0 && u >= 0 && u <= 1) {
+            if (t >= 0 && u >= 0 && u <= 1 &&
+                ((abs(prod(direction, t)) <= currentMinDistance) || (currentMinDistance == -1))) {
                 currentMinDistance = abs(prod(direction, t));
-                this->line = line2P(p1, p1 + prod(direction, t));
+                this->p2 = p1 + prod(direction, t);
+                this->line = line2P(p1, p2);
             }
+        }
+    }
+
+    Ray computeBoundaryRelection(Boundary &boundary) {
+        Vector2f a = direction, l = boundary.direction;
+        if (!isEqual(det(a, l) , 0)) {
+            l = normalize(l);
+            a = normalize(a);
+            Vector2f lNormal;
         }
     }
 };
@@ -187,7 +211,7 @@ int main() {
 
     Boundary boundary1(Vector2f(100, 100), Vector2f(500, 300)),
             boundary2(Vector2f(200, 800), Vector2f(400, 50)),
-            boundary3(Vector2f(0, 0), Vector2f(150, 400));
+            boundary3(Vector2f(500, 0), Vector2f(150, 400));
 
 
     Scene scene(window);
@@ -195,7 +219,7 @@ int main() {
     scene.addBoundary(boundary2);
     scene.addBoundary(boundary3);
 
-    LightSource source(window, Vector2f(200, 400));
+    LightSource source(window, Vector2f(700, 400));
     source.computeSceneInteraction(scene);
 
     scene.draw();
