@@ -41,17 +41,21 @@ Vector2f prod(Vector2f vector, double num) {
     return Vector2f(vector.x * num, vector.y * num);
 }
 
-Vector2f normalize(Vector2f &vector){
-    return prod(vector,1/abs(vector));
+Vector2f normalize(Vector2f &vector) {
+    return prod(vector, 1 / abs(vector));
 }
 
-Vector2f normalVector(Vector2f &vector){
-    return prod(vector,1/abs(vector));
+Vector2f normalVector(Vector2f &vector) {
+    return Vector2f(-vector.y, vector.x);
 }
 
-bool isEqual (double num1, double num2){
+bool isEqual(double num1, double num2) {
     double absoluteEpsilon = 0.0001;
     return fabs(num2 - num1) <= absoluteEpsilon;
+}
+
+double scalarProd(Vector2f v1, Vector2f v2) {
+    return v1.x * v2.x + v1.y * v2.y;
 }
 
 //
@@ -94,7 +98,8 @@ public:
 
 class Ray : public Line {
 private:
-    double currentMinDistance = 10000;
+    double currentMinDistance = -1;
+    Boundary *currentClosestBoundary;
 protected:
 
 public:
@@ -104,7 +109,7 @@ public:
 
     void computeBoundaryIntersection(Boundary &boundary) {
         Vector2f a = direction, l = boundary.direction;
-        if (!isEqual(det(a, l) , 0)) {
+        if (!isEqual(det(a, l), 0) && (&boundary != currentClosestBoundary)) {
             double x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
             double x3 = boundary.p1.x, y3 = boundary.p1.y, x4 = boundary.p2.x, y4 = boundary.p2.y;
 
@@ -115,19 +120,25 @@ public:
             //std::cout << "t, u:" << t << " " << u << std::endl;
             if (t >= 0 && u >= 0 && u <= 1 &&
                 ((abs(prod(direction, t)) <= currentMinDistance) || (currentMinDistance == -1))) {
+
                 currentMinDistance = abs(prod(direction, t));
+                currentClosestBoundary = &boundary;
+
+                this->line = line2P(p1, p1 + prod(direction, t));
                 this->p2 = p1 + prod(direction, t);
-                this->line = line2P(p1, p2);
+                this->direction = prod(direction, t);
             }
         }
     }
 
-    Ray computeBoundaryRelection(Boundary &boundary) {
-        Vector2f a = direction, l = boundary.direction;
-        if (!isEqual(det(a, l) , 0)) {
+    Ray computeBoundaryRelection() {
+        Vector2f a = direction, l = currentClosestBoundary->direction;
+        if (!isEqual(det(a, l), 0)) {
             l = normalize(l);
             a = normalize(a);
-            Vector2f lNormal;
+            Vector2f n = normalVector(l);
+            Vector2f refVector = a - prod(n, 2 * scalarProd(n, a));
+            return Ray(p2, p2 + refVector);
         }
     }
 };
@@ -164,15 +175,16 @@ public:
 class LightSource {
 protected:
     sf::RenderWindow *window;
+
+public:
     Vector2f origin;
     std::vector<Ray> rays;
 
-public:
-    LightSource(sf::RenderWindow &window, Vector2f origin) {
+    LightSource(sf::RenderWindow &window, Vector2f origin, int n = 10) {
         this->window = &window;
         this->origin = origin;
-        for (int i = 0; i < 100; ++i) {
-            rays.emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / 100), sin(i * 2 * 3.14 / 100))));
+        for (int i = 0; i < n; ++i) {
+            rays.emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / n), sin(i * 2 * 3.14 / n))));
         }
     }
 
@@ -222,8 +234,24 @@ int main() {
     LightSource source(window, Vector2f(700, 400));
     source.computeSceneInteraction(scene);
 
+    std::vector<Ray> reflections;
+    for (auto &ray : source.rays) {
+        reflections.emplace_back(ray.computeBoundaryRelection());
+        for (auto &boundary : scene.boundaries) {
+            ray.computeBoundaryIntersection(boundary);
+        }
+    }
+
+    for (auto &reflection : reflections) {
+        window.draw(reflection.line);
+    }
+
     scene.draw();
     source.drawSource();
+
+    for (auto &reflection : reflections) {
+
+    }
 
     //////////////////////////////////////////////////////////////////////////
     window.display();
