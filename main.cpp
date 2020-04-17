@@ -92,14 +92,14 @@ class Boundary : public Line {
 protected:
 
 public:
-    Boundary(Vector2f p1, Vector2f p2) : Line(p1, p2) {
+    Boundary(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0)) : Line(p1, p2) {
     }
 };
 
 class Ray : public Line {
 private:
     double currentMinDistance = -1;
-    Boundary *currentClosestBoundary;
+    Boundary currentClosestBoundary;
 protected:
 
 public:
@@ -109,7 +109,7 @@ public:
 
     void computeBoundaryIntersection(Boundary &boundary) {
         Vector2f a = direction, l = boundary.direction;
-        if (!isEqual(det(a, l), 0) && (&boundary != currentClosestBoundary)) {
+        if (!isEqual(det(a, l), 0)) {
             double x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
             double x3 = boundary.p1.x, y3 = boundary.p1.y, x4 = boundary.p2.x, y4 = boundary.p2.y;
 
@@ -118,21 +118,21 @@ public:
             double u =
                     -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
             //std::cout << "t, u:" << t << " " << u << std::endl;
-            if (t >= 0 && u >= 0 && u <= 1 &&
-                ((abs(prod(direction, t)) <= currentMinDistance) || (currentMinDistance == -1))) {
+            if (t > 0 && u >= 0 && u <= 1 &&
+                ((abs(prod(direction, t)) < currentMinDistance) || (currentMinDistance == -1))) {
 
                 currentMinDistance = abs(prod(direction, t));
-                currentClosestBoundary = &boundary;
+                currentClosestBoundary = boundary;
 
-                this->line = line2P(p1, p1 + prod(direction, t));
-                this->p2 = p1 + prod(direction, t);
-                this->direction = prod(direction, t);
+                line = line2P(p1, p1 + prod(direction, t));
+                p2 = p1 + prod(direction, t);
+                direction = prod(direction, t);
             }
         }
     }
 
     Ray computeBoundaryRelection() {
-        Vector2f a = direction, l = currentClosestBoundary->direction;
+        Vector2f a = direction, l = currentClosestBoundary.direction;
         if (!isEqual(det(a, l), 0)) {
             l = normalize(l);
             a = normalize(a);
@@ -165,6 +165,13 @@ public:
         boundaries.push_back(boundary);
     }
 
+    void setColor(sf::Color color) {
+        for (auto &boundary : boundaries) {
+            boundary.line[0].color = color;
+            boundary.line[1].color = color;
+        }
+    }
+
     void draw() {
         for (const auto &boundary : boundaries) {
             window->draw(boundary.line);
@@ -178,28 +185,58 @@ protected:
 
 public:
     Vector2f origin;
-    std::vector<Ray> rays;
+    std::vector<std::vector<Ray>> rays;
 
     LightSource(sf::RenderWindow &window, Vector2f origin, int n = 10) {
         this->window = &window;
         this->origin = origin;
+        rays.emplace_back(std::vector<Ray>());
         for (int i = 0; i < n; ++i) {
-            rays.emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / n), sin(i * 2 * 3.14 / n))));
+            rays[0].emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / n), sin(i * 2 * 3.14 / n))));
         }
     }
 
     void drawSource() {
-        for (const auto &ray : rays) {
-            window->draw(ray.line);
+        sf::CircleShape originDot;
+        originDot.setPosition(origin-Vector2f(10,10));
+        originDot.setFillColor(sf::Color::White);
+        originDot.setOutlineColor(sf::Color::White);
+        originDot.setRadius(10);
+        window->draw(originDot);
+
+        for (auto &generation : rays) {
+            for (auto &ray : generation) {
+                window->draw(ray.line);
+            }
         }
     }
 
-    void computeSceneInteraction(Scene &scene) {
-        for (auto &ray : rays) {
-            for (auto &boundary : scene.boundaries) {
-                ray.computeBoundaryIntersection(boundary);
+    void computeSceneInteraction(Scene &scene, int reflectionDepth = 0) {
+        for (auto &generation : rays) {
+            for (auto &ray : generation) {
+                for (auto &boundary : scene.boundaries) {
+                    ray.computeBoundaryIntersection(boundary);
+                }
             }
         }
+
+        for (int i = 1; i < reflectionDepth + 1; ++i) {
+            rays.emplace_back(std::vector<Ray>());
+            for (auto &ray : rays[i - 1]) {
+                Ray reflection = ray.computeBoundaryRelection();
+                for (auto &boundary : scene.boundaries) {
+                    reflection.computeBoundaryIntersection(boundary);
+                }
+                rays[i].emplace_back(reflection);
+
+            }
+            for (auto &ray : rays[i]) {
+                for (auto &boundary : scene.boundaries) {
+                    ray.computeBoundaryIntersection(boundary);
+                }
+            }
+        }
+
     }
 };
 
@@ -230,28 +267,14 @@ int main() {
     scene.addBoundary(boundary1);
     scene.addBoundary(boundary2);
     scene.addBoundary(boundary3);
+    scene.setColor(sf::Color::Red);
 
-    LightSource source(window, Vector2f(700, 400));
-    source.computeSceneInteraction(scene);
-
-    std::vector<Ray> reflections;
-    for (auto &ray : source.rays) {
-        reflections.emplace_back(ray.computeBoundaryRelection());
-        for (auto &boundary : scene.boundaries) {
-            ray.computeBoundaryIntersection(boundary);
-        }
-    }
-
-    for (auto &reflection : reflections) {
-        window.draw(reflection.line);
-    }
+    LightSource source(window, Vector2f(700, 400), 5);
+    source.computeSceneInteraction(scene, 2);
 
     scene.draw();
     source.drawSource();
 
-    for (auto &reflection : reflections) {
-
-    }
 
     //////////////////////////////////////////////////////////////////////////
     window.display();
