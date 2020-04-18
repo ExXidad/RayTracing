@@ -93,6 +93,7 @@ public:
 class Boundary : public Line {
 private:
     int code;
+
 public:
     int getCode() const {
         return code;
@@ -102,12 +103,21 @@ public:
         Boundary::code = code;
     }
 
-protected:
+private:
+    bool globalBoundaryQ;
+public:
+    bool getGlobalBoundaryQ() const {
+        return globalBoundaryQ;
+    }
+
+    void setGlobalBoundaryQ(bool globalBoundary) {
+        Boundary::globalBoundaryQ = globalBoundary;
+    }
 
 public:
-    Boundary(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), int code = -1) :
+    Boundary(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), bool globalBoundary = false) :
             Line(p1, p2) {
-        this->code = code;
+        this->globalBoundaryQ = globalBoundary;
     }
 
 };
@@ -117,7 +127,15 @@ private:
     double currentMinDistance = -1;
     Boundary currentClosestBoundary;
     int reflectedBoundaryCode = -1;
-protected:
+
+public:
+    const Boundary &getCurrentClosestBoundary() const {
+        return currentClosestBoundary;
+    }
+
+    void setCurrentClosestBoundary(const Boundary &currentClosestBoundary) {
+        Ray::currentClosestBoundary = currentClosestBoundary;
+    }
 
 public:
     Ray(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), int reflectedBoundaryCode = -1) : Line(p1, p2) {
@@ -157,6 +175,13 @@ public:
         Vector2f refVector = a - prod(n, 2 * scalarProd(n, a));
         return Ray(p2, p2 + refVector, currentClosestBoundary.getCode());
     }
+
+
+    Ray computePassThrough() {
+        Vector2f a = direction;
+        a = normalize(a);
+        return Ray(p2, p2 + a, currentClosestBoundary.getCode());
+    }
 };
 
 void drawLineSet(std::vector<Ray> rays, sf::RenderWindow &window) {
@@ -180,10 +205,10 @@ public:
 
     Scene(sf::RenderWindow &window) {
         sf::Vector2u windowSize = window.getSize();
-        boundaries.emplace_back(Vector2f(0, 0), Vector2f(windowSize.x, 0));
-        boundaries.emplace_back(Vector2f(0, 0), Vector2f(0, windowSize.y));
-        boundaries.emplace_back(Vector2f(windowSize.x, 0), Vector2f(windowSize.x, windowSize.y));
-        boundaries.emplace_back(Vector2f(0, windowSize.y), Vector2f(windowSize.x, windowSize.y));
+        boundaries.emplace_back(Vector2f(0, 0), Vector2f(windowSize.x, 0), true);
+        boundaries.emplace_back(Vector2f(0, 0), Vector2f(0, windowSize.y), true);
+        boundaries.emplace_back(Vector2f(windowSize.x, 0), Vector2f(windowSize.x, windowSize.y), true);
+        boundaries.emplace_back(Vector2f(0, windowSize.y), Vector2f(windowSize.x, windowSize.y), true);
 
         for (int i = 0; i < boundaries.size(); ++i) {
             boundaries[i].setCode(i);
@@ -254,6 +279,7 @@ public:
                 ray.computeBoundaryIntersection(boundary);
             }
         }
+
         drawLineSet(rays[0], *window);
 
         for (int i = 1; i < reflectionDepth + 1; ++i) {
@@ -263,7 +289,16 @@ public:
                     reflection.computeBoundaryIntersection(boundary);
                 }
                 rays[1].emplace_back(reflection);
+
+                if (!ray.getCurrentClosestBoundary().getGlobalBoundaryQ()){
+                    Ray passed = ray.computePassThrough();
+                    for (auto &boundary : scene.boundaries) {
+                        passed.computeBoundaryIntersection(boundary);
+                    }
+                    rays[1].emplace_back(passed);
+                }
             }
+
             drawLineSet(rays[1], *window);
 
             rays[0].resize(rays[1].size());
@@ -304,8 +339,8 @@ int main() {
     scene.addBoundary(boundary3);
     scene.setColor(sf::Color::Red);
 
-    LightSource source(window, Vector2f(700, 400), 3);
-    source.computeSceneInteraction(scene, 3);
+    LightSource source(window, Vector2f(700, 400), 1);
+    source.computeSceneInteraction(scene, 4);
 
     source.drawSource();
     scene.drawScene();
