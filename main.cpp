@@ -115,9 +115,10 @@ public:
     }
 
 public:
-    Boundary(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), bool globalBoundary = false) :
+    Boundary(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), bool globalBoundary = false, int code = -1) :
             Line(p1, p2) {
         this->globalBoundaryQ = globalBoundary;
+        this->code = code;
     }
 
 };
@@ -197,7 +198,8 @@ void drawLineSet(std::vector<Boundary> rays, sf::RenderWindow &window) {
 }
 
 class Scene {
-protected:
+private:
+    int currentMaxCode;
     sf::RenderWindow *window;
 
 public:
@@ -214,12 +216,20 @@ public:
             boundaries[i].setCode(i);
         }
 
+        currentMaxCode = boundaries.size();
         this->window = &window;
     }
 
     void addBoundary(Boundary &boundary) {
         boundaries.push_back(boundary);
         updateLastBoundaryCode();
+    }
+
+    void addBoundaries(std::vector<Boundary> newBoundaries) {
+        for (auto &newBoundary : newBoundaries) {
+            boundaries.emplace_back(newBoundary);
+            updateLastBoundaryCode();
+        }
     }
 
     void setColor(sf::Color color) {
@@ -236,6 +246,7 @@ public:
 
     void updateLastBoundaryCode() {
         boundaries[boundaries.size() - 1].setCode(boundaries.size() - 1);
+        ++currentMaxCode;
     }
 };
 
@@ -290,7 +301,7 @@ public:
                 }
                 rays[1].emplace_back(reflection);
 
-                if (!ray.getCurrentClosestBoundary().getGlobalBoundaryQ()){
+                if (!ray.getCurrentClosestBoundary().getGlobalBoundaryQ()) {
                     Ray passed = ray.computePassThrough();
                     for (auto &boundary : scene.boundaries) {
                         passed.computeBoundaryIntersection(boundary);
@@ -307,6 +318,31 @@ public:
         }
 
 
+    }
+};
+
+class Circle {
+private:
+    std::vector<Boundary> boundaries;
+public:
+    const std::vector<Boundary> &getBoundaries() const {
+        return boundaries;
+    }
+
+public:
+    Vector2f origin;
+
+    Circle(Vector2f origin = Vector2f(0, 0), double R = 0, int N = 0, bool globalBoundaryQ = false) {
+        this->origin = origin;
+        for (int i = 0; i < N; ++i) {
+            Vector2f relative1(R * cos(2 * 3.141592 * i / N), R * sin(2 * 3.141592 * i / N));
+            Vector2f relative2(R * cos(2 * 3.141592 * (i + 1) / N), R * sin(2 * 3.141592 * (i + 1) / N));
+            boundaries.emplace_back(Boundary(origin + relative1, origin + relative2, globalBoundaryQ));
+        }
+    }
+
+    void draw(sf::RenderWindow &window) {
+        drawLineSet(boundaries, window);
     }
 };
 
@@ -339,8 +375,11 @@ int main() {
     scene.addBoundary(boundary3);
     scene.setColor(sf::Color::Red);
 
-    LightSource source(window, Vector2f(700, 400), 1);
-    source.computeSceneInteraction(scene, 4);
+    Circle circle(Vector2f(500, 500), 100, 30);
+    scene.addBoundaries(circle.getBoundaries());
+
+    LightSource source(window, Vector2f(700, 400), 2);
+    source.computeSceneInteraction(scene, 6);
 
     source.drawSource();
     scene.drawScene();
