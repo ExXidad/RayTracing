@@ -9,7 +9,11 @@ class Line;
 
 class Boundary;
 
+class Ray;
+
 class Scene;
+
+class LightSource;
 
 void keepWindowOpened(sf::RenderWindow &window) {
     while (window.isOpen()) {
@@ -80,6 +84,10 @@ public:
         this->direction = p2 - p1;// prod(p2 - p1, 1 / abs(p2 - p1));
         this->line = line2P(p1, p2);
     }
+
+    void drawLine(sf::RenderWindow &window) {
+        window.draw(line);
+    }
 };
 
 class Boundary : public Line {
@@ -112,7 +120,7 @@ private:
 protected:
 
 public:
-    Ray(Vector2f p1, Vector2f p2, int reflectedBoundaryCode = -1) : Line(p1, p2) {
+    Ray(Vector2f p1 = Vector2f(0, 0), Vector2f p2 = Vector2f(0, 0), int reflectedBoundaryCode = -1) : Line(p1, p2) {
         this->reflectedBoundaryCode = reflectedBoundaryCode;
     }
 
@@ -151,6 +159,17 @@ public:
     }
 };
 
+void drawLineSet(std::vector<Ray> rays, sf::RenderWindow &window) {
+    for (auto &ray : rays) {
+        ray.drawLine(window);
+    }
+}
+
+void drawLineSet(std::vector<Boundary> rays, sf::RenderWindow &window) {
+    for (auto &ray : rays) {
+        ray.drawLine(window);
+    }
+}
 
 class Scene {
 protected:
@@ -185,11 +204,10 @@ public:
         }
     }
 
-    void draw() {
-        for (const auto &boundary : boundaries) {
-            window->draw(boundary.line);
-        }
+    void drawScene() {
+        drawLineSet(boundaries, *window);
     }
+
 
     void updateLastBoundaryCode() {
         boundaries[boundaries.size() - 1].setCode(boundaries.size() - 1);
@@ -202,16 +220,18 @@ protected:
 
 public:
     Vector2f origin;
+
     std::vector<std::vector<Ray>> rays;
 
     LightSource(sf::RenderWindow &window, Vector2f origin, int n = 10) {
         this->window = &window;
         this->origin = origin;
-        rays.emplace_back(std::vector<Ray>());
+        rays.resize(2);
         for (int i = 0; i < n; ++i) {
             rays[0].emplace_back(Ray(origin, origin + Vector2f(cos(i * 2 * 3.14 / n), sin(i * 2 * 3.14 / n + 1))));
         }
     }
+
 
     void drawSource() {
         sf::CircleShape originDot;
@@ -234,23 +254,23 @@ public:
                 ray.computeBoundaryIntersection(boundary);
             }
         }
+        drawLineSet(rays[0], *window);
 
         for (int i = 1; i < reflectionDepth + 1; ++i) {
-            rays.emplace_back(std::vector<Ray>());
-            for (auto &ray : rays[i - 1]) {
+            for (auto &ray : rays[0]) {
                 Ray reflection = ray.computeBoundaryReflection();
                 for (auto &boundary : scene.boundaries) {
                     reflection.computeBoundaryIntersection(boundary);
                 }
-                rays[i].emplace_back(reflection);
-
+                rays[1].emplace_back(reflection);
             }
-//            for (auto &ray : rays[i]) {
-//                for (auto &boundary : scene.boundaries) {
-//                    ray.computeBoundaryIntersection(boundary);
-//                }
-//            }
+            drawLineSet(rays[1], *window);
+
+            rays[0].resize(rays[1].size());
+            rays[0] = rays[1];
+            rays[1].resize(0);
         }
+
 
     }
 };
@@ -260,7 +280,7 @@ int main() {
     int windowHeight = 900;
 
     sf::ContextSettings settings;
-    settings.majorVersion = 3.1;
+    settings.majorVersion = 4;
     settings.antialiasingLevel = 8;
 
     sf::RenderWindow window(sf::VideoMode(windowWidth, windowHeight), "RayTracing",
@@ -284,11 +304,11 @@ int main() {
     scene.addBoundary(boundary3);
     scene.setColor(sf::Color::Red);
 
-    LightSource source(window, Vector2f(700, 400), 1);
-    source.computeSceneInteraction(scene, 7);
+    LightSource source(window, Vector2f(700, 400), 3);
+    source.computeSceneInteraction(scene, 3);
 
-    scene.draw();
     source.drawSource();
+    scene.drawScene();
 
 
     //////////////////////////////////////////////////////////////////////////
