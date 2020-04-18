@@ -23,10 +23,6 @@ void keepWindowOpened(sf::RenderWindow &window) {
     }
 }
 
-double det(const mapDouble &map) {
-    return (map[0][0] * map[1][1] - map[0][1] * map[1][0]);
-}
-
 double det(Vector2f a, Vector2f l) {
     return (a.x * l.y - a.y * l.x);
 }
