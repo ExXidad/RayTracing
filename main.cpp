@@ -1,8 +1,6 @@
 #include <cmath>
 #include <iostream>
 #include <SFML/Graphics.hpp>
-#include "myTypes.h"
-#include <cmath>
 
 typedef sf::Vector2f Vector2f;
 typedef sf::Vector2i Vector2i;
